@@ -1,5 +1,7 @@
 import { Format } from "./../utils/Format";
 import { CameraController } from "./CameraController";
+import { MicrophoneController } from "./MicrophoneController";
+import { DocumentPreviewController } from "./DocumentPreviewController";
 
 export class WhatsAppController {
   constructor() {
@@ -166,8 +168,22 @@ export class WhatsAppController {
     });
 
     this.el.btnTakePicture.on("click", (e) => {
-      console.log("openCamera");
-      this._camera.stop();
+      let dataUrl = this._camera.takePicture();
+      this.el.pictureCamera.src = dataUrl;
+      this.el.pictureCamera.show();
+      this.el.videoCamera.hide();
+      this.el.btnReshootPanelCamera.show();
+      this.el.containerTakePicture.hide();
+      this.el.containerSendPicture.show();
+      //this._camera.stop();
+    });
+
+    this.el.btnReshootPanelCamera.on("click", (e) => {
+      this.el.pictureCamera.hide();
+      this.el.videoCamera.show();
+      this.el.btnReshootPanelCamera.hide();
+      this.el.containerTakePicture.show();
+      this.el.containerSendPicture.hide();
     });
 
     this.el.btnAttachDocument.on("click", (e) => {
@@ -176,6 +192,71 @@ export class WhatsAppController {
       this.el.panelDocumentPreview.css({
         height: "calc(100% - 120px)",
       });
+      this.el.inputDocument.click();
+    });
+
+    this.el.inputDocument.on("change", (e) => {
+      if (this.el.inputDocument.files.length) {
+        let file = this.el.inputDocument.files[0];
+
+        this.closeAllMainPanel();
+        this.el.panelMessagesContainer.hide();
+        this.el.panelDocumentPreview.addClass("open");
+        this.el.panelDocumentPreview.sleep(500, () => {
+          this.el.panelDocumentPreview.style.height = "calc(100% - 120px)";
+        });
+
+        this._documentPreview = new DocumentPreviewController(file);
+
+        this._documentPreview
+          .getPriviewData()
+          .then((data) => {
+            this.el.filePanelDocumentPreview.hide();
+            this.el.imagePanelDocumentPreview.show();
+            this.el.imgPanelDocumentPreview.src = data.src;
+            this.el.imgPanelDocumentPreview.show();
+
+            this.el.infoPanelDocumentPreview.innerHTML = data.info;
+          })
+          .catch((event) => {
+            if (event.error) {
+              console.error(event.event);
+            } else {
+              switch (file.type) {
+                case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                case "application/msword":
+                  this.el.iconPanelDocumentPreview.classList.value =
+                    "jcxhw icon-doc-doc";
+                  break;
+
+                case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                case "application/vnd.ms-excel":
+                  this.el.iconPanelDocumentPreview.classList.value =
+                    "jcxhw icon-doc-xls";
+                  break;
+
+                case "application/vnd.ms-powerpoint":
+                case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+                  this.el.iconPanelDocumentPreview.classList.value =
+                    "jcxhw icon-doc-ppt";
+                  break;
+
+                default:
+                  this.el.iconPanelDocumentPreview.classList.value =
+                    "jcxhw icon-doc-generic";
+              }
+
+              this.el.filePanelDocumentPreview.show();
+              this.el.imagePanelDocumentPreview.hide();
+
+              this.el.filenamePanelDocumentPreview.innerHTML = file.name;
+            }
+          });
+      }
+    });
+
+    this.el.btnSendPicture.on("click", (e) => {
+      console.log(this.el.pictureCamera.src);
     });
 
     this.el.btnClosePanelDocumentPreview.on("click", (e) => {
@@ -198,14 +279,30 @@ export class WhatsAppController {
     this.el.btnSendMicrophone.on("click", (e) => {
       this.el.recordMicrophone.show();
       this.el.btnSendMicrophone.hide();
-      this.startRecordMicrophoneTime();
+      
+
+      this._microphoneController = new MicrophoneController();
+
+      this._microphoneController.on("ready", (audio) => {
+        console.log("ready event");
+        this._microphoneController.startRecorder();
+      });
+
+      this._microphoneController.on("recordtimer", (timer) => {
+        this.el.recordMicrophoneTimer.innerHTML = Format.toTime(
+          timer
+        );
+      });
     });
 
     this.el.btnCancelMicrophone.on("click", (e) => {
+      this._microphoneController.stopRecorder();
+
       this.closeRecordMicrophone();
     });
 
     this.el.btnFinishMicrophone.on("click", (e) => {
+      this._microphoneController.stopRecorder();
       this.closeRecordMicrophone();
     });
 
@@ -263,19 +360,9 @@ export class WhatsAppController {
     });
   }
 
-  startRecordMicrophoneTime() {
-    let start = Date.now();
-    this._recordMicrophoneInterval = setInterval(() => {
-      this.el.recordMicrophoneTimer.innerHTML = Format.toTime(
-        Date.now() - start
-      );
-    }, 100);
-  }
-
   closeRecordMicrophone() {
     this.el.recordMicrophone.hide();
     this.el.btnSendMicrophone.show();
-    clearInterval(this._recordMicrophoneInterval);
   }
 
   closeAllMainPanel() {

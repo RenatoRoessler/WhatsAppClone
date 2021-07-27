@@ -1,6 +1,6 @@
 # Projeto WhatsApp Clone
 
-### Renato Roessler
+### By Renato Roessler
 
 Projeto desenvolvido como exemplo do Curso Completo de JavaScript.
 
