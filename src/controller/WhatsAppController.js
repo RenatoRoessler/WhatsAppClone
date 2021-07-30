@@ -142,22 +142,50 @@ export class WhatsAppController {
       display: "flex",
     });
 
+    this.el.panelMessagesContainer.innerHTML = "";
     Message.getRef(this._contactActive.chatId)
       .orderBy("timeStamp")
       .onSnapshot((docs) => {
-        this.el.panelMessagesContainer.innerHTML = "";
+        let scrollTop = this.el.panelMessagesContainer.scrollTop;
+        let scrollTopMax =
+          this.el.panelMessagesContainer.scrollHeight -
+          this.el.panelMessagesContainer.offSetHeight;
+        let autoScroll = scrollTop >= scrollTopMax;
+
         docs.forEach((doc) => {
           let data = doc.data();
           data.id = doc.id;
 
+          var message = new Message();
+          message.fromJSOM(data);
+          let me = data.from === this._user.email;
           if (!this.el.panelMessagesContainer.querySelector(`#_` + data.id)) {
-            let message = new Message();
-            message.fromJSOM(data);
-            let me = data.from === this._user.email;
+            
+            if (!me) {
+              doc.ref.set(
+                {
+                  status: "read",
+                },
+                { merge: true }
+              );
+            }
             let view = message.getViewElement(me);
             this.el.panelMessagesContainer.appendChild(view);
+          } else if(me) {
+            let msgEl = this.el.panelMessagesContainer.querySelector(
+              `#_` + data.id
+            );
+            msgEl.querySelector(".message-status").innerHTML =
+              message.getStatusViewElement().outerHTML;
           }
         });
+        if (autoScroll) {
+          this.el.panelMessagesContainer.scrollTop =
+            this.el.panelMessagesContainer.scrollHeight -
+            this.el.panelMessagesContainer.offSetHeight;
+        } else {
+          this.el.panelMessagesContainer.scrollTop = scrollTop;
+        }
       });
   }
 
@@ -230,6 +258,16 @@ export class WhatsAppController {
   }
 
   initEvents() {
+    this.el.inputSearchContacts.on("keyup", (e) => {
+      if (this.el.inputSearchContacts.value.length > 0) {
+        this.el.inputSearchContactsPlaceholder.hide();
+      } else {
+        this.el.inputSearchContactsPlaceholder.show();
+      }
+
+      this._user.getContacts(this.el.inputSearchContacts.value);
+    });
+
     this.el.myPhoto.on("click", (e) => {
       this.closeAllLeftPanel();
       this.el.panelEditProfile.show();
@@ -320,7 +358,8 @@ export class WhatsAppController {
     this.el.inputPhoto.on("change", (e) => {
       console.log(this.el.inputPhoto.files);
       [...this.el.inputPhoto.files].forEach((file) => {
-        console.log(file);
+        Message.sendImage(this._contactActive.chatId, this._user.email, file)
+ 
       });
     });
     this.el.btnAttachCamera.on("click", (e) => {
